@@ -23,7 +23,7 @@ flowchart TB
     n2@{ shape: db}
     n3@{ shape: internal-storage}
 ```
-##How It Works
+## How It Works
 
    Authoring: Users write technical notes inside Obsidian on their local machines.
 
@@ -33,7 +33,7 @@ flowchart TB
 
    Deployment: A optimized Bash script acts as the webhook listener: it handles folder organization, injects custom CSS, blinds layout files (workspace.json), and commands MkDocs to build a static html portal in seconds.
 
-##Prerequisites
+## Prerequisites
 
 This architecture assumes a self-hosted environment where Gitea and MkDocs reside on the same Linux server (e.g., Debian/Ubuntu), and users author content locally.
 1. Server-Side Requirements
@@ -46,18 +46,18 @@ This architecture assumes a self-hosted environment where Gitea and MkDocs resid
 
    
 
-Installing Dependencies & MkDocs Extensions:
+# Installing Dependencies & MkDocs Extensions:
 
 To leverage all the features of this pipeline (like highlighter support, multi-page layout, and absolute roaming links), install MkDocs along with its essential plugins:
 
-# Install system packages
+## Install system packages
 sudo apt update && sudo apt install git python3 python3-pip python3-venv jq -y
 
-# Setup virtual environment for MkDocs
+## Setup virtual environment for MkDocs
 python3 -m venv venv-mkdocs
 source venv-mkdocs/bin/activate
 
-# Install MkDocs, Themes, and Extensions
+## Install MkDocs, Themes, and Extensions
 pip install mkdocs mkdocs-awesome-pages-plugin mkdocs-roamlinks-plugin
 
 2. Client-Side Requirements (User's Machine)
@@ -68,18 +68,19 @@ pip install mkdocs mkdocs-awesome-pages-plugin mkdocs-roamlinks-plugin
 
     Gitea Access Token: An active personal access token to allow seamless authentication from local scripts and plugins.
 
-🛠️ Deployment & Project Structure
+# Deployment & Project Structure
 
 To make this ecosystem production-ready, this repository provides two core automation scripts:
-A. The Client-Side Sync Script (sync-local-wikis.sh)
+
+## A. The Client-Side Sync Script (sync-local-wikis.sh)
 
 Located in the client/ folder, this script runs on the users' machines. It fetches all repositories from your Gitea Organization automatically, handles the initial clone, and injects a bulletproof .gitignore policy locally to prevent file locking conflicts (workspace.json).
 
-B. The Server-Side Webhook Listener (webhook-builder.sh)
+## B. The Server-Side Webhook Listener (webhook-builder.sh)
 
 Located in the server/ folder, this script is executed whenever Gitea receives a push. It handles concurrency locks, structures the MkDocs environment, and runs isolated or portal-wide rebuilds.
 
-Git Ignore Policy (Crucial)
+## Git Ignore Policy (Crucial)
 
 Obsidian creates highly dynamic cache files under the .obsidian/ directory (such as workspace.json and graph.json). To prevent constant merge conflicts between team members, our client-side automation guarantees the following rule enforcement:
 
