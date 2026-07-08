@@ -67,14 +67,30 @@ for REPO_NAME in $REPOS; do
     if [ -d "$REPO_NAME" ]; then
         echo -e "${YELLOW}[+] Updating existing local wiki: $REPO_NAME...${NC}"
         cd "$REPO_NAME"
-        
         # Pull incoming shifts discarding local uncommitted structural drift conflicts
         git pull --force
-        cd ..
     else
         echo -e "${CYAN}[+] Cloning new wiki configuration: $REPO_NAME...${NC}"
         git clone "$AUTH_CLONE_URL"
+        cd "$REPO_NAME"
     fi
+
+    # --- Step 4.1: Enforce Obsidian Rules safely if .gitignore doesn't have them ---
+    # Running inside the repository directory context
+    if [ ! -f .gitignore ] || ! grep -q ".obsidian/workspace.json" .gitignore; then
+        echo "[+] Injecting missing Obsidian protection rules into .gitignore..."
+        cat << 'EOF' >> .gitignore
+
+# Added automatically by sync script to prevent vault locking conflicts
+.obsidian/workspace.json
+.obsidian/workspace
+.obsidian/graph.json
+.obsidian/plugins/obsidian-git/queue.json
+EOF
+    fi
+
+    # Step out of the repository back to the central destination folder before the next loop
+    cd ..
 done
 
 # --- Step 5: Finalization Notification ---
