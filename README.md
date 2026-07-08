@@ -5,9 +5,13 @@
 [![Obsidian](https://img.shields.io/badge/Editor-Obsidian-purple?logo=obsidian)](https://obsidian.md/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An automated, self-hosted documentation pipeline that synchronization local Obsidian vaults with a Gitea server, triggering immediate Webhook builds to serve elegant Markdown-based websites via MkDocs.
+A self-hosted documentation pipeline that integrates Obsidian, Gitea, and MkDocs.
 
-As soon as a document is updated locally, it is pushed to an internal Git server. This guarantees backups, version control, and full traceability. Concurrently, a Gitea webhook triggers a server-side script to automatically rebuild the webpage, providing a historic log of your files and an easy-to-navigate portal for the end user.
+Documentation is authored locally in Obsidian, synchronized with Gitea repositories, and automatically published through MkDocs whenever a repository receives a push event.
+
+---
+
+## Architecture
 
 ```mermaid
 ---
@@ -16,77 +20,168 @@ config:
   layout: fixed
 ---
 flowchart TB
-    n1["Input via Obsidian"] -- Automatic git push --> n2["Gitea repository"]
-    n2 -- Webhook --> n3["Mkdocs webpage"]
+    author["Obsidian Vault"]
+    repo["Gitea Repository"]
+    build["MkDocs Build"]
+    site["Static Website"]
 
-    n1@{ shape: lin-proc}
-    n2@{ shape: db}
-    n3@{ shape: internal-storage}
+    author -->|Git Push| repo
+    repo -->|Webhook| build
+    build -->|mkdocs build| site
 ```
-## How It Works
 
-   Authoring: Users write technical notes inside Obsidian on their local machines.
+---
 
-   Synchronization: The Obsidian Git plugin automatically tracks changes and runs background commits/pushes (or instantly via dedicated hotkeys).
+## Workflow
 
-   Automation: Gitea catches the push and fires a Webhook to the documentation server.
+1. Documentation is created or updated in an Obsidian vault.
+2. Changes are committed and pushed to Gitea using the Obsidian Git plugin or the synchronization script.
+3. Gitea sends a webhook request to the documentation server.
+4. The server synchronizes the repositories and executes `mkdocs build`.
+5. The generated site is published by the configured web server.
 
-   Deployment: A optimized Bash script acts as the webhook listener: it handles folder organization, injects custom CSS, blinds layout files (workspace.json), and commands MkDocs to build a static html portal in seconds.
+---
 
-## Prerequisites
+## Repository Structure
 
-This architecture assumes a self-hosted environment where Gitea and MkDocs reside on the same Linux server (e.g., Debian/Ubuntu), and users author content locally.
-1. Server-Side Requirements
+```text
+.
+├── client/
+│   └── sync-local-wikis.sh
+├── server/
+│   └── webhook-builder.sh
+├── template/
+│   ├── index.md
+│   └── .obsidian/
+└── README.md
+```
 
-    Gitea Server: A running instance with administrator access (to configure webhooks).
+| Directory | Description |
+|-----------|-------------|
+| `client/` | Client-side synchronization scripts. |
+| `server/` | Server-side build and deployment scripts. |
+| `template/` | Template repository used to create new documentation repositories. |
 
-    Python 3 & Pip: Required to isolate MkDocs inside a virtual environment.
+---
 
-    Web Server: Nginx or Apache configured to serve the static files folder (e.g., /var/www/frida).
+## Requirements
 
-   
+### Server
 
-# Installing Dependencies & MkDocs Extensions:
+- Linux (Debian/Ubuntu or compatible)
+- Git
+- Python 3
+- Python Virtual Environment (`venv`)
+- Gitea
+- MkDocs
+- Nginx or Apache
 
-To leverage all the features of this pipeline (like highlighter support, multi-page layout, and absolute roaming links), install MkDocs along with its essential plugins:
+### Client
 
-## Install system packages
-sudo apt update && sudo apt install git python3 python3-pip python3-venv jq -y
+- Obsidian
+- Obsidian Git community plugin
+- Personal Access Token for Gitea
 
-## Setup virtual environment for MkDocs
+---
+
+## Installation
+
+### Install system packages
+
+```bash
+sudo apt update
+
+sudo apt install \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    jq -y
+```
+
+### Create the Python virtual environment
+
+```bash
 python3 -m venv venv-mkdocs
 source venv-mkdocs/bin/activate
+```
 
-## Install MkDocs, Themes, and Extensions
-pip install mkdocs mkdocs-awesome-pages-plugin mkdocs-roamlinks-plugin
+### Install MkDocs and plugins
 
-2. Client-Side Requirements (User's Machine)
+```bash
+pip install \
+    mkdocs \
+    mkdocs-awesome-pages-plugin \
+    mkdocs-roamlinks-plugin
+```
 
-    Obsidian: Installed on the local machine.
+---
 
-    Obsidian Git Plugin: Installed via Community Plugins.
+## Components
 
-    Gitea Access Token: An active personal access token to allow seamless authentication from local scripts and plugins.
+### Client Synchronization
 
-# Deployment & Project Structure
+The `client/sync-local-wikis.sh` script:
 
-To make this ecosystem production-ready, this repository provides two core automation scripts:
+- Retrieves repositories from the configured Gitea organization.
+- Clones repositories that do not exist locally.
+- Updates existing repositories.
+- Applies the project's Git ignore policy.
 
-## A. The Client-Side Sync Script (sync-local-wikis.sh)
+See `client/README.md` for configuration details.
 
-Located in the client/ folder, this script runs on the users' machines. It fetches all repositories from your Gitea Organization automatically, handles the initial clone, and injects a bulletproof .gitignore policy locally to prevent file locking conflicts (workspace.json).
+### Server Build
 
-## B. The Server-Side Webhook Listener (webhook-builder.sh)
+The `server/webhook-builder.sh` script:
 
-Located in the server/ folder, this script is executed whenever Gitea receives a push. It handles concurrency locks, structures the MkDocs environment, and runs isolated or portal-wide rebuilds.
+- Receives webhook requests.
+- Prevents concurrent builds using `flock`.
+- Synchronizes local repositories.
+- Removes obsolete repositories from the documentation tree.
+- Executes `mkdocs build`.
+- Publishes the generated site.
 
-## Git Ignore Policy (Crucial)
+See `server/README.md` for deployment instructions.
 
-Obsidian creates highly dynamic cache files under the .obsidian/ directory (such as workspace.json and graph.json). To prevent constant merge conflicts between team members, our client-side automation guarantees the following rule enforcement:
+### Repository Template
 
+The `template/` directory contains the base repository used when creating new documentation projects.
+
+It includes:
+
+- Initial documentation structure.
+- Recommended Obsidian configuration.
+- Default repository layout.
+
+See `template/README.md` for details.
+
+---
+
+## Git Ignore Policy
+
+The client synchronization script excludes user-specific Obsidian files to reduce merge conflicts.
+
+```gitignore
 .obsidian/workspace.json
 .obsidian/workspace
 .obsidian/graph.json
 .obsidian/plugins/obsidian-git/queue.json
+```
 
-Distributed under the MIT License. See LICENSE for more information.
+---
+
+## Deployment
+
+1. Configure the template repository in Gitea.
+2. Deploy the server-side build script.
+3. Configure a webhook for push events.
+4. Run the client synchronization script on user workstations.
+5. Open the generated MkDocs site through the configured web server.
+
+---
+
+## License
+
+This project is distributed under the MIT License.
+
+See the `LICENSE` file for details.
