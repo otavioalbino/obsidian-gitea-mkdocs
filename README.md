@@ -14,20 +14,24 @@ Documentation is authored locally in Obsidian, synchronized with Gitea repositor
 ## Architecture
 
 ```mermaid
----
-config:
-  theme: redux
-  layout: fixed
----
-flowchart TB
-    author["Obsidian Vault"]
-    repo["Gitea Repository"]
-    build["MkDocs Build"]
-    site["Static Website"]
+flowchart LR
 
-    author -->|Git Push| repo
-    repo -->|Webhook| build
-    build -->|mkdocs build| site
+    A[Obsidian]
+    B[Obsidian Git Plugin]
+    C[Gitea]
+    D[Webhook]
+    E[Build Script]
+    F[MkDocs]
+    G[Nginx / Apache]
+    H[Documentation Website]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
 ```
 
 ---
