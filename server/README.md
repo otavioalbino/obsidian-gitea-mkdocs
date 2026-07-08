@@ -1,89 +1,48 @@
-# Server-Side Webhook Automation & Deployment
+# Client-Side Synchronization Automation
 
-This directory contains the server-side automation responsible for handling Gitea webhook events and executing MkDocs builds.
+This directory contains the client-side synchronization script used to keep local Obsidian workspaces aligned with the repositories hosted on Gitea.
 
 ## Overview
 
-When documentation is pushed from Obsidian to Gitea, the changes are stored only in the Git repository. To publish the updated documentation, the server receives the webhook event, synchronizes the local repository, and generates the static site using MkDocs.
+In environments where documentation is distributed across multiple repositories, manually cloning and updating each repository becomes difficult to maintain.
 
-The automation also handles situations such as:
-
-- Multiple webhook requests arriving simultaneously.
-- Removal of repositories that are no longer available in Gitea.
+The `sync-local-wikis.sh` script automates repository discovery and synchronization by querying the Gitea API and updating the local workspace.
 
 ## Workflow
 
-The `webhook-builder.sh` script performs the following steps:
+The script performs the following steps:
 
-1. **Acquire an exclusive lock**
+1. **Initialize the workspace**
 
-   An exclusive lock is created using `flock` (`/tmp/mkdocs_build.lock`). If another build is already running, subsequent executions wait until the current process finishes.
+   Ensures that the target workspace directory (for example, `$HOME/Obsidian-Vaults`) exists.
 
-2. **Synchronize repositories**
+2. **Discover repositories**
 
-   - For existing repositories, the script performs a `git reset --hard` followed by the required synchronization steps. It also ensures that the repository is available through the appropriate symbolic link inside the MkDocs `docs/` directory.
-   - If a repository no longer exists in Gitea, the corresponding symbolic link and generated HTML output are removed.
+   Retrieves the list of repositories from the Gitea API (`/api/v1/orgs/{org}/repos`) using a Personal Access Token.
 
-3. **Activate the Python virtual environment**
+3. **Filter repositories**
 
-   The script activates the dedicated virtual environment (`venv-mkdocs`) before executing MkDocs. This isolates project dependencies from the system-wide Python installation.
+   Excludes repositories that should not be synchronized locally, such as templates or administrative repositories.
 
-4. **Build the documentation**
+4. **Synchronize repositories**
 
-   The documentation is generated using:
+   - If a repository does not exist locally, it is cloned.
+   - If the repository already exists, it is updated using `git pull --force`.
 
-   ```bash
-   mkdocs build --clean
-   ```
+## Usage
 
-   The generated files are written to the configured web directory (for example, `/var/www/html/wiki`).
-
-## Deployment
-
-### 1. Install dependencies
-
-Install the required packages and create the application directories.
-
-```bash
-sudo apt update
-sudo apt install git python3 python3-pip python3-venv jq -y
-
-sudo mkdir -p /opt/mkdocs-gitea-wiki
-sudo mkdir -p /var/www/html/wiki
-
-sudo chown -R $USER:www-data /opt/mkdocs-gitea-wiki /var/www/html/wiki
-```
-
-### 2. Create the Python virtual environment
-
-```bash
-cd /opt/mkdocs-gitea-wiki
-
-python3 -m venv venv-mkdocs
-source venv-mkdocs/bin/activate
-
-pip install mkdocs \
-    mkdocs-awesome-pages-plugin \
-    mkdocs-roamlinks-plugin
-```
-
-### 3. Configure the Gitea webhook
-
-Configure a webhook that sends push events to the server responsible for executing `webhook-builder.sh`.
+### Generate a Personal Access Token
 
 In Gitea:
 
-1. Open **Settings → Webhooks** for the repository or organization.
-2. Select **Add Webhook → Gitea**.
-3. Configure:
+1. Open **Settings → Applications**.
+2. Generate a Personal Access Token with permission to access the required repositories.
 
-| Setting | Value |
-|---------|-------|
-| Target URL | `http://<SERVER_IP>:<LISTENER_PORT>/webhook` |
-| HTTP Method | `POST` |
-| Content Type | `application/json` |
-| Trigger | `Push Events` |
+### Run the script
 
-4. Save the webhook.
+```bash
+chmod +x sync-local-wikis.sh
+./sync-local-wikis.sh <PERSONAL_ACCESS_TOKEN>
+```
 
-Whenever a push event is received, the listener invokes `webhook-builder.sh`, which synchronizes the repositories and rebuilds the MkDocs site.
+The script can be executed manually or scheduled using a task scheduler such as `cron` on Linux/macOS or Task Scheduler on Windows (for example, through WSL).
